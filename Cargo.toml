@@ -1,0 +1,15 @@
+[package]
+name = "mole"
+version = "0.1.0"
+#edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+chrono = "0.4"
+libbpf-rs = "0.15"
+libc = "0.2"
+plain = "0.2"
+structopt = "0.3"
+
+[build-dependencies]
+libbpf-cargo = "0.9.4"
