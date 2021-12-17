@@ -133,7 +133,7 @@ pub struct ProcStatusData {
 
 pub fn read_proc_status(pid: i32) -> Option<ProcStatusData> {
     let mut data = ProcStatusData {
-	name: String::new(),
+        name: String::new(),
         vctxsw: 0,
         ivctxsw: 0,
     };
@@ -154,9 +154,9 @@ pub fn read_proc_status(pid: i32) -> Option<ProcStatusData> {
 
 #[derive(Debug)]
 pub struct ProcSchedstatData {
-    pub on_cpu: u64, // se.sum_exec_runtime
+    pub on_cpu: u64,          // se.sum_exec_runtime
     pub waiting_for_cpu: u64, // sched_info.run_delay
-    pub slices: u64, // sched_info.pcount
+    pub slices: u64,          // sched_info.pcount
 }
 
 pub fn read_proc_schedstat(pid: i32) -> Option<ProcSchedstatData> {

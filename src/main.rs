@@ -1,9 +1,10 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::str::FromStr;
 use std::thread;
-use std::time::{Duration};
+use std::time::Duration;
 
 mod procfs;
 
@@ -27,7 +28,7 @@ fn inspect_thread(tgid: i32, pid: i32) -> Option<ThreadDataSnapshot> {
 
     let ret = ThreadDataSnapshot {
         pid: pid,
-	comm: status.name,
+        comm: status.name,
         utime: stat.utime,
         stime: stat.stime,
         vctxsw: status.vctxsw,
@@ -55,9 +56,9 @@ fn inspect_process(pid: i32) -> Option<ProcessDataSnapshot> {
     for task in tasks {
         let s = task.unwrap().file_name().into_string().unwrap();
         let tid = i32::from_str(&s).unwrap();
-	if let Some(td) = inspect_thread(pid, tid) {
+        if let Some(td) = inspect_thread(pid, tid) {
             ret.threads.insert(tid, td);
-	}
+        }
     }
 
     Some(ret)
@@ -67,8 +68,8 @@ fn print_delta_threads(p: &ThreadDataSnapshot, n: &ThreadDataSnapshot) {
     assert_eq!(p.pid, n.pid);
 
     println!(
-        "{}({}) usr {} sys {} vctxsw {} ivctxsw {} on_cpu {} wait_for_cpu {} slices {}",
-	p.comm,
+        "{:16} {:<8} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10}",
+        p.comm,
         p.pid,
         n.utime - p.utime,
         n.stime - p.stime,
@@ -83,12 +84,28 @@ fn print_delta_threads(p: &ThreadDataSnapshot, n: &ThreadDataSnapshot) {
 fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot) {
     assert_eq!(p.pid, n.pid);
 
+    let p_threads: HashSet<_> = p.threads.keys().cloned().collect();
+    let n_threads: HashSet<_> = p.threads.keys().cloned().collect();
+    let alive: HashSet<_> = p_threads.intersection(&n_threads).collect();
+    let died: HashSet<_> = p_threads.difference(&n_threads).collect();
+    let born: HashSet<_> = n_threads.intersection(&p_threads).collect();
+
+    println!("{} threads, {} died, {} born", n_threads.len(), died.len(), born.len());
+
+    println!(
+        "{:16} {:8} {:10} {:10} {:10} {:10} {:10} {:10} {:10}",
+        "comm", "pid", "usr%", "sys%", "vctxsw", "ivctxsw", "on_cpu", "wait", "slices"
+    );
+    println!("--------------------------------------------------------------------------------------------------");
+
     for curr in &n.threads {
         match p.threads.get(&curr.0) {
             Some(prev) => print_delta_threads(prev, curr.1),
             None => println!("new {}", curr.0),
         }
     }
+
+    println!("");
 }
 
 fn main() {
@@ -101,7 +118,7 @@ fn main() {
     loop {
         let _prev_stat = procfs::read_stat();
         let prev = inspect_process(pid).expect("Can't find the process");
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(5));
         let _curr_stat = procfs::read_stat();
         let curr = inspect_process(pid).expect("Can't find the process");
 
