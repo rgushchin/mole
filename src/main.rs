@@ -98,11 +98,8 @@ fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot) {
     );
     println!("--------------------------------------------------------------------------------------------------");
 
-    for curr in &n.threads {
-        match p.threads.get(&curr.0) {
-            Some(prev) => print_delta_threads(prev, curr.1),
-            None => println!("new {}", curr.0),
-        }
+    for pid in &alive {
+        print_delta_threads(p.threads.get(&pid).unwrap(), n.threads.get(&pid).unwrap());
     }
 
     println!("");
