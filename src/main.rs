@@ -6,6 +6,7 @@ use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
+mod output;
 mod procfs;
 
 #[derive(Debug)]
@@ -64,45 +65,118 @@ fn inspect_process(pid: i32) -> Option<ProcessDataSnapshot> {
     Some(ret)
 }
 
-fn print_delta_threads(p: &ThreadDataSnapshot, n: &ThreadDataSnapshot) {
-    assert_eq!(p.pid, n.pid);
+fn system_load(p: &procfs::StatData, n: &procfs::StatData) -> u64 {
+    let total = n.user
+        + n.nice
+        + n.system
+        + n.idle
+        + n.iowait
+        + n.irq
+        + n.softirq
+        + n.steal
+        + n.guest
+        + n.guest_nice
+        - p.user
+        - p.nice
+        - p.system
+        - p.idle
+        - p.iowait
+        - p.irq
+        - p.softirq
+        - p.steal
+        - p.guest
+        - p.guest_nice;
+    let idle = n.idle - p.idle;
 
-    println!(
-        "{:16} {:<8} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10}",
-        p.comm,
-        p.pid,
-        n.utime - p.utime,
-        n.stime - p.stime,
-        n.vctxsw - p.vctxsw,
-        n.ivctxsw - p.ivctxsw,
-        n.on_cpu - p.on_cpu,
-        n.waiting_for_cpu - p.waiting_for_cpu,
-        n.slices - p.slices,
-    );
+    total - idle
 }
 
-fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot) {
+fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot, load: u64) {
     assert_eq!(p.pid, n.pid);
 
     let p_threads: HashSet<_> = p.threads.keys().cloned().collect();
     let n_threads: HashSet<_> = p.threads.keys().cloned().collect();
     let alive: HashSet<_> = p_threads.intersection(&n_threads).collect();
     let died: HashSet<_> = p_threads.difference(&n_threads).collect();
-    let born: HashSet<_> = n_threads.intersection(&p_threads).collect();
-
-    println!("{} threads, {} died, {} born", n_threads.len(), died.len(), born.len());
+    let born: HashSet<_> = n_threads.difference(&p_threads).collect();
 
     println!(
-        "{:16} {:8} {:10} {:10} {:10} {:10} {:10} {:10} {:10}",
-        "comm", "pid", "usr%", "sys%", "vctxsw", "ivctxsw", "on_cpu", "wait", "slices"
+        "{} threads, {} died, {} born",
+        n_threads.len(),
+        died.len(),
+        born.len()
     );
-    println!("--------------------------------------------------------------------------------------------------");
+
+    let mut table = output::Table {
+        columns: vec![
+            output::Column {
+                title: "pid".to_string(),
+                width: 8,
+                fmt: None,
+            },
+            output::Column {
+                title: "comm".to_string(),
+                width: 16,
+                fmt: None,
+            },
+            output::Column {
+                title: "usr%".to_string(),
+                width: 4,
+                fmt: None,
+            },
+            output::Column {
+                title: "sys%".to_string(),
+                width: 4,
+                fmt: None,
+            },
+            output::Column {
+                title: "vctxsw".to_string(),
+                width: 10,
+                fmt: None,
+            },
+            output::Column {
+                title: "ivctxsw".to_string(),
+                width: 10,
+                fmt: None,
+            },
+            output::Column {
+                title: "on_cpu".to_string(),
+                width: 10,
+                fmt: None,
+            },
+            output::Column {
+                title: "wait".to_string(),
+                width: 10,
+                fmt: None,
+            },
+            output::Column {
+                title: "slices".to_string(),
+                width: 10,
+                fmt: None,
+            },
+        ],
+	data: vec![],
+	sort_by: Some(1),
+	filter_by: None,
+    };
 
     for pid in &alive {
-        print_delta_threads(p.threads.get(&pid).unwrap(), n.threads.get(&pid).unwrap());
+	let p = p.threads.get(&pid).unwrap();
+        let n = n.threads.get(&pid).unwrap();
+
+	output::add_row(&mut table, vec![
+	    output::Data::Int(p.pid as i64),
+	    output::Data::Text(p.comm.clone()),
+	    output::Data::Float((n.utime - p.utime) as f64 / load as f64 * 100.0),
+	    output::Data::Float((n.stime - p.stime) as f64 / load as f64 * 100.0),
+	    output::Data::UInt(n.vctxsw - p.vctxsw),
+	    output::Data::UInt(n.ivctxsw - p.ivctxsw),
+	    output::Data::UInt(n.on_cpu - p.on_cpu),
+	    output::Data::UInt(n.waiting_for_cpu - p.waiting_for_cpu),
+	    output::Data::UInt(n.slices - p.slices)]);
     }
 
-    println!("");
+    println!("{}", output::display_table(&mut table));
 }
 
 fn main() {
@@ -113,12 +187,12 @@ fn main() {
     let pid = i32::from_str(&pid_arg).expect("pid is not specified or can't be parsed");
 
     loop {
-        let _prev_stat = procfs::read_stat();
+        let prev_stat = procfs::read_stat();
         let prev = inspect_process(pid).expect("Can't find the process");
         thread::sleep(Duration::from_secs(5));
-        let _curr_stat = procfs::read_stat();
+        let curr_stat = procfs::read_stat();
         let curr = inspect_process(pid).expect("Can't find the process");
 
-        print_delta_procs(&prev, &curr);
+        print_delta_procs(&prev, &curr, system_load(&prev_stat, &curr_stat));
     }
 }
