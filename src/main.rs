@@ -155,25 +155,29 @@ fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot, load: u64
                 fmt: None,
             },
         ],
-	data: vec![],
-	sort_by: Some(1),
-	filter_by: None,
+        data: vec![],
+        sort_by: Some(1),
+        filter_by: None,
     };
 
     for pid in &alive {
-	let p = p.threads.get(&pid).unwrap();
+        let p = p.threads.get(&pid).unwrap();
         let n = n.threads.get(&pid).unwrap();
 
-	output::add_row(&mut table, vec![
-	    output::Data::Int(p.pid as i64),
-	    output::Data::Text(p.comm.clone()),
-	    output::Data::Float((n.utime - p.utime) as f64 / load as f64 * 100.0),
-	    output::Data::Float((n.stime - p.stime) as f64 / load as f64 * 100.0),
-	    output::Data::UInt(n.vctxsw - p.vctxsw),
-	    output::Data::UInt(n.ivctxsw - p.ivctxsw),
-	    output::Data::UInt(n.on_cpu - p.on_cpu),
-	    output::Data::UInt(n.waiting_for_cpu - p.waiting_for_cpu),
-	    output::Data::UInt(n.slices - p.slices)]);
+        output::add_row(
+            &mut table,
+            vec![
+                output::Data::Int(p.pid as i64),
+                output::Data::Text(p.comm.clone()),
+                output::Data::Float((n.utime - p.utime) as f64 / load as f64 * 100.0),
+                output::Data::Float((n.stime - p.stime) as f64 / load as f64 * 100.0),
+                output::Data::UInt(n.vctxsw - p.vctxsw),
+                output::Data::UInt(n.ivctxsw - p.ivctxsw),
+                output::Data::UInt(n.on_cpu - p.on_cpu),
+                output::Data::UInt(n.waiting_for_cpu - p.waiting_for_cpu),
+                output::Data::UInt(n.slices - p.slices),
+            ],
+        );
     }
 
     println!("{}", output::display_table(&mut table));
