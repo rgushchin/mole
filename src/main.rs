@@ -107,58 +107,17 @@ fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot, load: u64
         born.len()
     );
 
-    let mut table = output::Table {
-        columns: vec![
-            output::Column {
-                title: "pid".to_string(),
-                width: 8,
-                fmt: None,
-            },
-            output::Column {
-                title: "comm".to_string(),
-                width: 16,
-                fmt: None,
-            },
-            output::Column {
-                title: "usr%".to_string(),
-                width: 4,
-                fmt: None,
-            },
-            output::Column {
-                title: "sys%".to_string(),
-                width: 4,
-                fmt: None,
-            },
-            output::Column {
-                title: "vctxsw".to_string(),
-                width: 10,
-                fmt: None,
-            },
-            output::Column {
-                title: "ivctxsw".to_string(),
-                width: 10,
-                fmt: None,
-            },
-            output::Column {
-                title: "on_cpu".to_string(),
-                width: 10,
-                fmt: None,
-            },
-            output::Column {
-                title: "wait".to_string(),
-                width: 10,
-                fmt: None,
-            },
-            output::Column {
-                title: "slices".to_string(),
-                width: 10,
-                fmt: None,
-            },
-        ],
-        data: vec![],
-        sort_by: Some(1),
-        filter_by: None,
-    };
+    let mut table = table![
+        ("pid", 8),
+        ("comm", 16),
+        ("usr%", 4),
+        ("sys%", 4),
+        ("vctxsw", 10),
+        ("ivctxsw", 10),
+        ("on_cpu", 10),
+        ("wait", 10),
+        ("slices", 10)
+    ];
 
     for pid in &alive {
         let p = p.threads.get(&pid).unwrap();

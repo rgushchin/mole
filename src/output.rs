@@ -8,7 +8,6 @@ pub enum Data {
 pub struct Column {
     pub title: String,
     pub width: usize,
-    pub fmt: Option<fn(&Data, &Column) -> String>,
 }
 
 pub struct Table {
@@ -27,7 +26,7 @@ fn default_fmt(data: &Data, column: &Column) -> String {
     match data {
         Data::UInt(v) => format!("{1:<0$}", column.width, v),
         Data::Int(v) => format!("{1:<0$}", column.width, v),
-        Data::Float(v) => format!("{1:<0$}", column.width, v),
+        Data::Float(v) => format!("{1:<0$.1}", column.width, v),
         Data::Text(v) => format!("{1:<0$}", column.width, v),
     }
 }
@@ -78,35 +77,21 @@ pub fn display_table(table: &mut Table) -> String {
     output
 }
 
+#[macro_export]
+macro_rules! table {
+    ( $( $x:expr ),* ) => {
+	$crate::output::Table {
+	    columns: vec![$($crate::output::Column {title: $x.0.to_string(), width: $x.1}),*],
+	    data: vec![],
+	    sort_by: Some(0),
+	    filter_by: None,
+	}
+    }
+}
+
 #[test]
 fn create_test_table() {
-    let mut t = Table {
-        columns: vec![
-            Column {
-                title: "Pid".to_string(),
-                width: 8,
-                fmt: None,
-            },
-            Column {
-                title: "Comm".to_string(),
-                width: 8,
-                fmt: None,
-            },
-            Column {
-                title: "Usr%".to_string(),
-                width: 8,
-                fmt: None,
-            },
-            Column {
-                title: "Sys%".to_string(),
-                width: 8,
-                fmt: None,
-            },
-        ],
-        data: vec![],
-        sort_by: Some(2),
-        filter_by: None,
-    };
+    let mut t = table![("Pid", 8), ("Comm", 16), ("usr%", 4), ("Sys%", 4)];
 
     add_row(
         &mut t,
