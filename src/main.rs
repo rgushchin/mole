@@ -91,7 +91,12 @@ fn system_load(p: &procfs::StatData, n: &procfs::StatData) -> u64 {
     total - idle
 }
 
-fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot, load: u64) {
+fn print_delta_procs(
+    table: &mut output::Table,
+    p: &ProcessDataSnapshot,
+    n: &ProcessDataSnapshot,
+    load: u64,
+) {
     assert_eq!(p.pid, n.pid);
 
     let p_threads: HashSet<_> = p.threads.keys().cloned().collect();
@@ -106,18 +111,6 @@ fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot, load: u64
         died.len(),
         born.len()
     );
-
-    let mut table = table![
-        ("pid", 8),
-        ("comm", 16),
-        ("usr%", 4),
-        ("sys%", 4),
-        ("vctxsw", 10),
-        ("ivctxsw", 10),
-        ("on_cpu", 10),
-        ("wait", 10),
-        ("slices", 10)
-    ];
 
     for pid in &alive {
         let p = p.threads.get(&pid).unwrap();
@@ -137,12 +130,23 @@ fn print_delta_procs(p: &ProcessDataSnapshot, n: &ProcessDataSnapshot, load: u64
     }
 
     println!("{}", table.display_table());
+    table.clear_data();
 }
 
 fn main() {
-    let mut args = env::args_os();
-    println!("{:?}", args);
+    let mut table = table![
+        ("pid", 8),
+        ("comm", 16),
+        ("usr%", 4),
+        ("sys%", 4),
+        ("vctxsw", 10),
+        ("ivctxsw", 10),
+        ("on_cpu", 10),
+        ("wait", 10),
+        ("slices", 10)
+    ];
 
+    let mut args = env::args_os();
     let pid_arg = args.nth(1).unwrap().into_string().unwrap();
     let pid = i32::from_str(&pid_arg).expect("pid is not specified or can't be parsed");
 
@@ -153,6 +157,11 @@ fn main() {
         let curr_stat = procfs::read_stat();
         let curr = inspect_process(pid).expect("Can't find the process");
 
-        print_delta_procs(&prev, &curr, system_load(&prev_stat, &curr_stat));
+        print_delta_procs(
+            &mut table,
+            &prev,
+            &curr,
+            system_load(&prev_stat, &curr_stat),
+        );
     }
 }

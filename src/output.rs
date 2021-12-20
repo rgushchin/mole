@@ -77,6 +77,10 @@ impl Table {
 
         output
     }
+
+    pub fn clear_data(&mut self) {
+        self.data.clear();
+    }
 }
 
 #[macro_export]
