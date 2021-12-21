@@ -32,8 +32,8 @@ fn inspect_thread(tgid: i32, pid: i32) -> Option<ThreadDataSnapshot> {
         stime: stat.stime,
         vctxsw: status.vctxsw,
         ivctxsw: status.ivctxsw,
-        on_cpu: schedstat.on_cpu,
-        waiting_for_cpu: schedstat.waiting_for_cpu,
+        on_cpu: schedstat.on_cpu / 1000, // nanoseconds to microseconds
+        waiting_for_cpu: schedstat.waiting_for_cpu / 1000, // nanoseconds to microseconds
         slices: schedstat.slices,
     };
 
@@ -111,16 +111,21 @@ fn print_delta_procs(
         let p = prev.threads.get(&pid).unwrap();
         let c = curr.threads.get(&pid).unwrap();
 
+        let on_cpu = c.on_cpu - p.on_cpu;
+        let slices = c.slices - p.slices;
+        let avg_slice = if slices > 0 { on_cpu / slices } else { 0 };
+
         table.add_row(vec![
             output::Data::Int(p.pid as i64),
             output::Data::Text(p.comm.clone()),
             output::Data::Float((c.utime - p.utime) as f64 / load as f64 * 100.0),
             output::Data::Float((c.stime - p.stime) as f64 / load as f64 * 100.0),
+            output::Data::UInt(on_cpu),
+            output::Data::UInt(c.waiting_for_cpu - p.waiting_for_cpu),
+            output::Data::UInt(slices),
+            output::Data::UInt(avg_slice),
             output::Data::UInt(c.vctxsw - p.vctxsw),
             output::Data::UInt(c.ivctxsw - p.ivctxsw),
-            output::Data::UInt(c.on_cpu - p.on_cpu),
-            output::Data::UInt(c.waiting_for_cpu - p.waiting_for_cpu),
-            output::Data::UInt(c.slices - p.slices),
         ]);
     }
 
@@ -148,11 +153,12 @@ fn main() {
         ("comm", 16),
         ("usr%", 4),
         ("sys%", 4),
-        ("vctxsw", 10),
-        ("ivctxsw", 10),
         ("on_cpu", 10),
         ("wait", 10),
-        ("slices", 10)
+        ("slices", 10),
+        ("avg_slice", 10),
+        ("vctxsw", 10),
+        ("ivctxsw", 10)
     ];
 
     let args = CliArgs::from_args();

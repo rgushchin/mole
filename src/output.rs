@@ -91,7 +91,7 @@ impl Table {
                 None
             }
         } else {
-            self.columns.iter().position(|c| c.title == s)
+            self.columns.iter().position(|c| c.title.starts_with(s))
         }
     }
 }
