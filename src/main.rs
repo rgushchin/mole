@@ -88,39 +88,39 @@ fn system_load(p: &procfs::StatData, n: &procfs::StatData) -> u64 {
 
 fn print_delta_procs(
     table: &mut output::Table,
-    p: &ProcessDataSnapshot,
-    n: &ProcessDataSnapshot,
+    prev: &ProcessDataSnapshot,
+    curr: &ProcessDataSnapshot,
     load: u64,
 ) {
-    assert_eq!(p.pid, n.pid);
+    assert_eq!(prev.pid, curr.pid);
 
-    let p_threads: HashSet<_> = p.threads.keys().cloned().collect();
-    let n_threads: HashSet<_> = p.threads.keys().cloned().collect();
-    let alive: HashSet<_> = p_threads.intersection(&n_threads).collect();
-    let died: HashSet<_> = p_threads.difference(&n_threads).collect();
-    let born: HashSet<_> = n_threads.difference(&p_threads).collect();
+    let p_threads: HashSet<_> = prev.threads.keys().cloned().collect();
+    let c_threads: HashSet<_> = curr.threads.keys().cloned().collect();
+    let alive: HashSet<_> = p_threads.intersection(&c_threads).collect();
+    let died: HashSet<_> = p_threads.difference(&c_threads).collect();
+    let born: HashSet<_> = c_threads.difference(&p_threads).collect();
 
     println!(
         "{} threads, {} died, {} born",
-        n_threads.len(),
+        c_threads.len(),
         died.len(),
         born.len()
     );
 
     for pid in &alive {
-        let p = p.threads.get(&pid).unwrap();
-        let n = n.threads.get(&pid).unwrap();
+        let p = prev.threads.get(&pid).unwrap();
+        let c = curr.threads.get(&pid).unwrap();
 
         table.add_row(vec![
             output::Data::Int(p.pid as i64),
             output::Data::Text(p.comm.clone()),
-            output::Data::Float((n.utime - p.utime) as f64 / load as f64 * 100.0),
-            output::Data::Float((n.stime - p.stime) as f64 / load as f64 * 100.0),
-            output::Data::UInt(n.vctxsw - p.vctxsw),
-            output::Data::UInt(n.ivctxsw - p.ivctxsw),
-            output::Data::UInt(n.on_cpu - p.on_cpu),
-            output::Data::UInt(n.waiting_for_cpu - p.waiting_for_cpu),
-            output::Data::UInt(n.slices - p.slices),
+            output::Data::Float((c.utime - p.utime) as f64 / load as f64 * 100.0),
+            output::Data::Float((c.stime - p.stime) as f64 / load as f64 * 100.0),
+            output::Data::UInt(c.vctxsw - p.vctxsw),
+            output::Data::UInt(c.ivctxsw - p.ivctxsw),
+            output::Data::UInt(c.on_cpu - p.on_cpu),
+            output::Data::UInt(c.waiting_for_cpu - p.waiting_for_cpu),
+            output::Data::UInt(c.slices - p.slices),
         ]);
     }
 
