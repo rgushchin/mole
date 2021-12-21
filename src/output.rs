@@ -54,6 +54,14 @@ impl Data {
 impl Table {
     pub fn add_row(&mut self, data: Vec<Data>) {
         assert_eq!(self.columns.len(), data.len());
+
+	// skip zeros
+	if let Some(filter_by) = self.filter_by {
+	    if data.get(filter_by).unwrap().is_empty() {
+		return;
+	    }
+	}
+
         self.data.push(data);
     }
 
@@ -81,8 +89,10 @@ impl Table {
         // print data
         let mut y = 0;
         for row in &self.data {
-	    if let Some(filter_by) = self.filter_by {
-		if row.get(filter_by).unwrap().is_empty() {
+	    // ? print last top elements
+	    if let Some(top) = self.top {
+		if y + top < self.data.len() {
+		    y += 1;
 		    continue;
 		}
 	    }
@@ -94,11 +104,6 @@ impl Table {
             }
             output.push_str(&newline);
 	    y += 1;
-	    if let Some(top) = self.top {
-		if y > top {
-		    break;
-		}
-	    }
         }
 
         output
