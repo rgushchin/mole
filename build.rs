@@ -1,9 +1,10 @@
-// use std::fs::create_dir_all;
-// use std::path::Path;
+use std::fs::create_dir_all;
+use std::path::Path;
 
-// use libbpf_cargo::SkeletonBuilder;
+extern crate libbpf_cargo;
+use libbpf_cargo::SkeletonBuilder;
 
-// const SRC: &str = "./src/bpf/mole.bpf.c";
+const SRC: &str = "./src/bpf/mole.bpf.c";
 
 fn main() {
     // It's unfortunate we cannot use `OUT_DIR` to store the generated skeleton.
@@ -14,8 +15,8 @@ fn main() {
     //
     // However, there is hope! When the above feature stabilizes we can clean this
     // all up.
-    // create_dir_all("./src/bpf/.output").unwrap();
-    // let skel = Path::new("./src/bpf/.output/mole.skel.rs");
-    // SkeletonBuilder::new(SRC).generate(&skel).unwrap();
-    // println!("cargo:rerun-if-changed={}", SRC);
+    create_dir_all("./src/bpf/.output").unwrap();
+    let skel = Path::new("./src/bpf/.output/mole.skel.rs");
+    SkeletonBuilder::new(SRC).generate(&skel).unwrap();
+    println!("cargo:rerun-if-changed={}", SRC);
 }

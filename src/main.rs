@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::thread;
 use std::time::Duration;
-extern crate structopt;
 use structopt::StructOpt;
 
+mod bpf;
 mod output;
 mod procfs;
 
@@ -133,6 +132,31 @@ fn print_delta_procs(
     table.clear_data();
 }
 
+fn tgidpid_tgid(tgidpid: u64) -> i32 {
+    (tgidpid >> 32) as i32
+}
+
+fn tgidpid_pid(tgidpid: u64) -> i32 {
+    tgidpid as i32
+}
+
+fn print_wakeups(wakeups: &bpf::Wakeups, curr: &ProcessDataSnapshot) {
+    for item in wakeups {
+        let src = item.0 .0;
+        let tgt = item.0 .1;
+        let count = item.1;
+
+        println!(
+            "{:?} {} {} -> {} {}",
+            count,
+            tgidpid_tgid(src),
+            tgidpid_pid(src),
+            tgidpid_tgid(tgt),
+            tgidpid_pid(tgt)
+        );
+    }
+}
+
 #[derive(Debug, StructOpt)]
 struct CliArgs {
     #[structopt(short = "p", long, conflicts_with = "cmd")]
@@ -187,12 +211,15 @@ fn main() {
         );
     }
 
-    let pid = args.pid.unwrap();
+    let pid = args.pid.expect("Pid is not specififed");
 
     loop {
         let prev_stat = procfs::read_stat();
         let prev = inspect_process(pid).expect("Can't find the process");
-        thread::sleep(Duration::from_millis(args.sleep_ms));
+
+        let wakeups =
+            bpf::record_wakeups(pid, Duration::from_millis(args.sleep_ms), false).unwrap();
+
         let curr_stat = procfs::read_stat();
         let curr = inspect_process(pid).expect("Can't find the process");
 
@@ -202,5 +229,7 @@ fn main() {
             &curr,
             system_load(&prev_stat, &curr_stat),
         );
+
+        print_wakeups(&wakeups, &curr);
     }
 }
