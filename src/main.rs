@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::env;
-use std::fs;
-use std::str::FromStr;
+use std::collections::{HashMap, HashSet};
 use std::thread;
 use std::time::Duration;
+extern crate structopt;
+use structopt::StructOpt;
 
 mod output;
 mod procfs;
@@ -53,10 +51,7 @@ fn inspect_process(pid: i32) -> Option<ProcessDataSnapshot> {
         threads: HashMap::new(),
     };
 
-    let tasks = fs::read_dir(format!("/proc/{}/task/", pid)).ok()?;
-    for task in tasks {
-        let s = task.unwrap().file_name().into_string().unwrap();
-        let tid = i32::from_str(&s).unwrap();
+    for tid in procfs::read_proc_threads(pid) {
         if let Some(td) = inspect_thread(pid, tid) {
             ret.threads.insert(tid, td);
         }
@@ -133,6 +128,20 @@ fn print_delta_procs(
     table.clear_data();
 }
 
+#[derive(Debug, StructOpt)]
+struct CliArgs {
+    #[structopt(short = "p", long, conflicts_with = "cmd")]
+    pid: Option<i32>,
+
+    // #[structopt(short="c", long, conflicts_with="pid")]
+    // cmd: Option<String>,
+    #[structopt(short = "s", long)]
+    sort_by: Option<String>,
+
+    #[structopt(short = "t", long, required = false, default_value = "1000")]
+    sleep_ms: u64,
+}
+
 fn main() {
     let mut table = table![
         ("pid", 8),
@@ -146,14 +155,22 @@ fn main() {
         ("slices", 10)
     ];
 
-    let mut args = env::args_os();
-    let pid_arg = args.nth(1).unwrap().into_string().unwrap();
-    let pid = i32::from_str(&pid_arg).expect("pid is not specified or can't be parsed");
+    let args = CliArgs::from_args();
+
+    if let Some(sort_by) = args.sort_by {
+        table.sort_by = Some(
+            table
+                .column_index_by_desc(&sort_by)
+                .expect("Invalid column specified"),
+        );
+    }
+
+    let pid = args.pid.unwrap();
 
     loop {
         let prev_stat = procfs::read_stat();
         let prev = inspect_process(pid).expect("Can't find the process");
-        thread::sleep(Duration::from_secs(5));
+        thread::sleep(Duration::from_millis(args.sleep_ms));
         let curr_stat = procfs::read_stat();
         let curr = inspect_process(pid).expect("Can't find the process");
 

@@ -1,4 +1,6 @@
 use std::cmp::Ordering;
+use std::str::FromStr;
+
 pub enum Data {
     UInt(u64),
     Int(i64),
@@ -15,7 +17,6 @@ pub struct Table {
     pub columns: Vec<Column>,
     pub data: Vec<Vec<Data>>,
     pub sort_by: Option<usize>,
-    pub filter_by: Option<usize>,
 }
 
 fn default_fmt(data: &Data, column: &Column) -> String {
@@ -81,6 +82,18 @@ impl Table {
     pub fn clear_data(&mut self) {
         self.data.clear();
     }
+
+    pub fn column_index_by_desc(&self, s: &str) -> Option<usize> {
+        if let Ok(i) = usize::from_str(s) {
+            if i < self.columns.len() {
+                Some(i)
+            } else {
+                None
+            }
+        } else {
+            self.columns.iter().position(|c| c.title == s)
+        }
+    }
 }
 
 #[macro_export]
@@ -90,7 +103,6 @@ macro_rules! table {
 	    columns: vec![$($crate::output::Column {title: $x.0.to_string(), width: $x.1}),*],
 	    data: vec![],
 	    sort_by: Some(0),
-	    filter_by: None,
 	}
     }
 }
