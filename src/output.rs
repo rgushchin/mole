@@ -17,6 +17,8 @@ pub struct Table {
     pub columns: Vec<Column>,
     pub data: Vec<Vec<Data>>,
     pub sort_by: Option<usize>,
+    pub filter_by: Option<usize>,
+    pub top: Option<usize>,
 }
 
 fn default_fmt(data: &Data, column: &Column) -> String {
@@ -35,6 +37,17 @@ fn compare_data(a: &Data, b: &Data) -> Ordering {
         (Data::Float(x), Data::Float(y)) => x.partial_cmp(&y).unwrap_or(Ordering::Less),
         (Data::Text(x), Data::Text(y)) => x.cmp(&y),
         (_, _) => panic!(),
+    }
+}
+
+impl Data {
+    fn is_empty(&self) -> bool {
+	match self {
+            Data::UInt(v) => *v == 0,
+            Data::Int(v) => *v == 0,
+            Data::Float(v) => *v < 0.0001,
+            Data::Text(v) => v.is_empty(),
+	}
     }
 }
 
@@ -66,14 +79,26 @@ impl Table {
         output.push_str(&newline);
 
         // print data
+        let mut y = 0;
         for row in &self.data {
-            let mut i = 0;
+	    if let Some(filter_by) = self.filter_by {
+		if row.get(filter_by).unwrap().is_empty() {
+		    continue;
+		}
+	    }
+            let mut x = 0;
             for cell in row {
-                output.push_str(&default_fmt(cell, &self.columns[i]));
+                output.push_str(&default_fmt(cell, &self.columns[x]));
                 output.push_str(&delimiter);
-                i += 1;
+                x += 1;
             }
             output.push_str(&newline);
+	    y += 1;
+	    if let Some(top) = self.top {
+		if top >= y {
+		    break;
+		}
+	    }
         }
 
         output
@@ -103,6 +128,8 @@ macro_rules! table {
 	    columns: vec![$($crate::output::Column {title: $x.0.to_string(), width: $x.1}),*],
 	    data: vec![],
 	    sort_by: Some(0),
+	    filter_by: None,
+	    top: None,
 	}
     }
 }

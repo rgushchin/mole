@@ -140,11 +140,18 @@ struct CliArgs {
 
     // #[structopt(short="c", long, conflicts_with="pid")]
     // cmd: Option<String>,
+    //
     #[structopt(short = "s", long)]
     sort_by: Option<String>,
 
+    #[structopt(short = "f", long)]
+    filter_by: Option<String>,
+
     #[structopt(short = "t", long, required = false, default_value = "1000")]
     sleep_ms: u64,
+
+    #[structopt(short = "n", long)]
+    top: Option<usize>,
 }
 
 fn main() {
@@ -162,11 +169,20 @@ fn main() {
     ];
 
     let args = CliArgs::from_args();
+    table.top = args.top;
 
     if let Some(sort_by) = args.sort_by {
         table.sort_by = Some(
             table
                 .column_index_by_desc(&sort_by)
+                .expect("Invalid column specified"),
+        );
+    }
+
+    if let Some(filter_by) = args.filter_by {
+        table.filter_by = Some(
+            table
+                .column_index_by_desc(&filter_by)
                 .expect("Invalid column specified"),
         );
     }
