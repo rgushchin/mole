@@ -116,9 +116,9 @@ fn parse_proc_stat(f: &str) -> Option<ProcStatData> {
 //
 // /proc/pid/stat is different to /proc/tgid/task/pid/stat
 //
-pub fn read_proc_stat(pid: i32) -> Option<ProcStatData> {
-    parse_proc_stat(&format!("/proc/{}/stat", pid))
-}
+// pub fn read_proc_stat(pid: i32) -> Option<ProcStatData> {
+//     parse_proc_stat(&format!("/proc/{}/stat", pid))
+// }
 
 pub fn read_thread_stat(tgid: i32, pid: i32) -> Option<ProcStatData> {
     parse_proc_stat(&format!("/proc/{}/task/{}/stat", tgid, pid))
