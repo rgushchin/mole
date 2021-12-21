@@ -95,7 +95,7 @@ impl Table {
             output.push_str(&newline);
 	    y += 1;
 	    if let Some(top) = self.top {
-		if top >= y {
+		if y > top {
 		    break;
 		}
 	    }
