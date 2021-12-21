@@ -51,7 +51,7 @@ fn inspect_process(pid: i32) -> Option<ProcessDataSnapshot> {
         threads: HashMap::new(),
     };
 
-    for tid in procfs::read_proc_threads(pid) {
+    for tid in procfs::read_proc_threads(pid).expect("Can't find the specified process") {
         if let Some(td) = inspect_thread(pid, tid) {
             ret.threads.insert(tid, td);
         }

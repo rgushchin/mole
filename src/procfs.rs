@@ -1,5 +1,4 @@
 use std::fs;
-use std::io;
 use std::str::FromStr;
 
 #[derive(Debug)]
@@ -174,7 +173,7 @@ pub fn read_proc_schedstat(pid: i32) -> Option<ProcSchedstatData> {
 }
 
 pub struct ProcTask {
-    dir: io::Result<std::fs::ReadDir>,
+    dir: std::fs::ReadDir,
 }
 
 impl Iterator for ProcTask {
@@ -182,21 +181,19 @@ impl Iterator for ProcTask {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut next = None;
-        if let Ok(dir) = &mut self.dir {
-            if let Some(s) = dir.next() {
-                if let Ok(s) = s {
-                    let s = s.file_name().into_string().unwrap();
-                    let tid = i32::from_str(&s).unwrap();
-                    next = Some(tid);
-                }
+        if let Some(s) = self.dir.next() {
+            if let Ok(s) = s {
+                let s = s.file_name().into_string().unwrap();
+                let tid = i32::from_str(&s).unwrap();
+                next = Some(tid);
             }
         }
         next
     }
 }
 
-pub fn read_proc_threads(pid: i32) -> ProcTask {
-    ProcTask {
-        dir: fs::read_dir(format!("/proc/{}/task/", pid)),
-    }
+pub fn read_proc_threads(pid: i32) -> Option<ProcTask> {
+    Some(ProcTask {
+        dir: fs::read_dir(format!("/proc/{}/task/", pid)).ok()?,
+    })
 }
