@@ -42,12 +42,12 @@ fn compare_data(a: &Data, b: &Data) -> Ordering {
 
 impl Data {
     fn is_empty(&self) -> bool {
-	match self {
+        match self {
             Data::UInt(v) => *v == 0,
             Data::Int(v) => *v == 0,
             Data::Float(v) => *v < 0.0001,
             Data::Text(v) => v.is_empty(),
-	}
+        }
     }
 }
 
@@ -55,12 +55,12 @@ impl Table {
     pub fn add_row(&mut self, data: Vec<Data>) {
         assert_eq!(self.columns.len(), data.len());
 
-	// skip zeros
-	if let Some(filter_by) = self.filter_by {
-	    if data.get(filter_by).unwrap().is_empty() {
-		return;
-	    }
-	}
+        // skip zeros
+        if let Some(filter_by) = self.filter_by {
+            if data.get(filter_by).unwrap().is_empty() {
+                return;
+            }
+        }
 
         self.data.push(data);
     }
@@ -89,13 +89,13 @@ impl Table {
         // print data
         let mut y = 0;
         for row in &self.data {
-	    // ? print last top elements
-	    if let Some(top) = self.top {
-		if y + top < self.data.len() {
-		    y += 1;
-		    continue;
-		}
-	    }
+            // ? print last top elements
+            if let Some(top) = self.top {
+                if y + top < self.data.len() {
+                    y += 1;
+                    continue;
+                }
+            }
             let mut x = 0;
             for cell in row {
                 output.push_str(&default_fmt(cell, &self.columns[x]));
@@ -103,7 +103,7 @@ impl Table {
                 x += 1;
             }
             output.push_str(&newline);
-	    y += 1;
+            y += 1;
         }
 
         output
