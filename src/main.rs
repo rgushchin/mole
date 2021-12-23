@@ -1,3 +1,4 @@
+use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use structopt::StructOpt;
@@ -140,21 +141,104 @@ fn tgidpid_pid(tgidpid: u64) -> i32 {
     tgidpid as i32
 }
 
+fn print_top_events(map: &HashMap<i32, u64>, curr: &ProcessDataSnapshot) -> Vec<String> {
+    let mut count_vec: Vec<_> = map.iter().collect();
+    count_vec.sort_by(|a, b| b.1.cmp(a.1));
+    let mut ret = vec![];
+    let unknown = "unknown".to_string();
+
+    let mut c = 0;
+    for i in count_vec {
+        if c > 20 {
+            break;
+        }
+        c += 1;
+        let pid = i.0;
+        let comm = match curr.threads.get(pid) {
+            Some(t) => &t.comm,
+            None => &unknown,
+        };
+        ret.push(format!("{:<10} {} ({})", i.1, comm, pid));
+        // 10 + 16 + 8 + 4 (two spaces and () ) = 38
+    }
+
+    ret
+}
+
 fn print_wakeups(wakeups: &bpf::Wakeups, curr: &ProcessDataSnapshot) {
+    let mut inputs: HashMap<i32, u64> = HashMap::new();
+    let mut outputs: HashMap<i32, u64> = HashMap::new();
+    let mut wakees: HashMap<i32, u64> = HashMap::new();
+    let mut wakers: HashMap<i32, u64> = HashMap::new();
+
+    let tgid = curr.pid;
+
     for item in wakeups {
         let src = item.0 .0;
         let tgt = item.0 .1;
         let count = item.1;
+        let tgid1 = tgidpid_tgid(src);
+        let pid1 = tgidpid_pid(src);
+        let tgid2 = tgidpid_tgid(tgt);
+        let pid2 = tgidpid_pid(tgt);
 
+        if tgid1 != tgid {
+            assert_eq!(tgid2, tgid);
+
+            let entry = inputs.entry(pid2).or_insert(0);
+            *entry += count;
+        }
+
+        if tgid2 != tgid {
+            assert_eq!(tgid1, tgid);
+
+            let entry = outputs.entry(pid1).or_insert(0);
+            *entry += count;
+        }
+
+        if tgid1 == tgid && tgid2 == tgid {
+            let entry = wakers.entry(pid1).or_insert(0);
+            *entry += count;
+            let entry = wakees.entry(pid2).or_insert(0);
+            *entry += count;
+        }
+    }
+
+    let inputs = print_top_events(&inputs, &curr);
+    let outputs = print_top_events(&outputs, &curr);
+    let nr = cmp::max(inputs.len(), outputs.len());
+    println!(
+        "{:38} {:38}\n{}",
+        "top inputs",
+        "top outputs",
+        &"-".repeat(38 + 38 + 1)
+    );
+    for i in 0..nr {
         println!(
-            "{:?} {} {} -> {} {}",
-            count,
-            tgidpid_tgid(src),
-            tgidpid_pid(src),
-            tgidpid_tgid(tgt),
-            tgidpid_pid(tgt)
+            "{:38} {:38}",
+            inputs.get(i).unwrap_or(&"".to_string()),
+            outputs.get(i).unwrap_or(&"".to_string())
         );
     }
+    println!("");
+
+    let wakers = print_top_events(&wakers, &curr);
+    let wakees = print_top_events(&wakees, &curr);
+    let nr = cmp::max(wakers.len(), wakees.len());
+    println!(
+        "{:38} {:38}\n{}",
+        "top wakees",
+        "top wakers",
+        &"-".repeat(38 + 38 + 1)
+    );
+    for i in 0..nr {
+        println!(
+            "{:38} {:38}",
+            wakers.get(i).unwrap_or(&"".to_string()),
+            wakees.get(i).unwrap_or(&"".to_string())
+        );
+    }
+    println!("");
 }
 
 #[derive(Debug, StructOpt)]
