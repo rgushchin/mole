@@ -1,4 +1,3 @@
-use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use structopt::StructOpt;
@@ -141,11 +140,13 @@ fn tgidpid_pid(tgidpid: u64) -> i32 {
     tgidpid as i32
 }
 
-fn print_top_events(map: &HashMap<i32, u64>, curr: &ProcessDataSnapshot) -> Vec<String> {
+fn print_top_events(map: &HashMap<i32, u64>, curr: &ProcessDataSnapshot) -> String {
     let mut count_vec: Vec<_> = map.iter().collect();
     count_vec.sort_by(|a, b| b.1.cmp(a.1));
-    let mut ret = vec![];
     let unknown = "unknown".to_string();
+
+    let mut table = table![("pid", 8), ("comm", 16), ("wakeups", 10)];
+    table.sort_by = Some(2); // sort by events
 
     let mut c = 0;
     for i in count_vec {
@@ -158,11 +159,39 @@ fn print_top_events(map: &HashMap<i32, u64>, curr: &ProcessDataSnapshot) -> Vec<
             Some(t) => &t.comm,
             None => &unknown,
         };
-        ret.push(format!("{:<10} {} ({})", i.1, comm, pid));
-        // 10 + 16 + 8 + 4 (two spaces and () ) = 38
+
+        table.add_row(vec![
+            output::Data::Int(*pid as i64),
+            output::Data::Text(comm.to_string()),
+            output::Data::UInt(*i.1),
+        ]);
     }
 
-    ret
+    table.display_table()
+}
+
+fn print_2tables(title1: &str, table1: &str, title2: &str, table2: &str) {
+    let mut l1 = table1.lines();
+    let mut l2 = table2.lines();
+
+    let width = table1.lines().nth(1).unwrap().len();
+
+    println!("{1:^0$}  {2:^0$}", width, title1, title2);
+    loop {
+        let s1 = l1.next();
+        let s2 = l2.next();
+        if s1.is_some() || s2.is_some() {
+            println!(
+                "{1:^0$}  {2:^0$}",
+                width,
+                s1.unwrap_or(""),
+                s2.unwrap_or("")
+            );
+        } else {
+            break;
+        }
+    }
+    println!("");
 }
 
 fn print_wakeups(wakeups: &bpf::Wakeups, curr: &ProcessDataSnapshot) {
@@ -206,39 +235,11 @@ fn print_wakeups(wakeups: &bpf::Wakeups, curr: &ProcessDataSnapshot) {
 
     let inputs = print_top_events(&inputs, &curr);
     let outputs = print_top_events(&outputs, &curr);
-    let nr = cmp::max(inputs.len(), outputs.len());
-    println!(
-        "{:38} {:38}\n{}",
-        "top inputs",
-        "top outputs",
-        &"-".repeat(38 + 38 + 1)
-    );
-    for i in 0..nr {
-        println!(
-            "{:38} {:38}",
-            inputs.get(i).unwrap_or(&"".to_string()),
-            outputs.get(i).unwrap_or(&"".to_string())
-        );
-    }
-    println!("");
-
     let wakers = print_top_events(&wakers, &curr);
     let wakees = print_top_events(&wakees, &curr);
-    let nr = cmp::max(wakers.len(), wakees.len());
-    println!(
-        "{:38} {:38}\n{}",
-        "top wakees",
-        "top wakers",
-        &"-".repeat(38 + 38 + 1)
-    );
-    for i in 0..nr {
-        println!(
-            "{:38} {:38}",
-            wakers.get(i).unwrap_or(&"".to_string()),
-            wakees.get(i).unwrap_or(&"".to_string())
-        );
-    }
-    println!("");
+
+    print_2tables("top inputs", &inputs, "top outputs", &outputs);
+    print_2tables("top wakees", &wakees, "top wakers", &wakers);
 }
 
 fn print_slices(slices: &mut bpf::Slices, curr: &ProcessDataSnapshot) {

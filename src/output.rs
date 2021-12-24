@@ -83,7 +83,7 @@ impl Table {
             output.push_str(&delimiter);
         }
         output.push_str(&newline);
-        output.push_str(&"-".repeat(output.len() - 2));
+        output.push_str(&"-".repeat(output.len() - 1));
         output.push_str(&newline);
 
         // print data
