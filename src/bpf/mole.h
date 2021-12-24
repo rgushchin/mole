@@ -1,7 +1,8 @@
 #ifndef __MOLE_H
 #define __MOLE_H
 
-struct wake_event {
+struct event {
+	unsigned long kind;
 	unsigned long src_tgidpid;
 	unsigned long tgt_tgidpid;
 };

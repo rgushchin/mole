@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 mod mole;
 use mole::*;
 
-unsafe impl Plain for mole_bss_types::wake_event {}
+unsafe impl Plain for mole_bss_types::event {}
 
 fn bump_memlock_rlimit() -> Result<()> {
     let rlimit = libc::rlimit {
@@ -23,24 +23,30 @@ fn bump_memlock_rlimit() -> Result<()> {
     Ok(())
 }
 
-pub type Wakeups = HashMap<(u64, u64), u64>;
+pub type Wakeups = HashMap<(u64, u64), u64>; // (src_tgidpid, tgt_tgidpid) -> count
+pub type Slices = HashMap<i32, Vec<u64>>; // pid, duration
 
-fn handle_event(ctx: &mut Wakeups, _cpu: i32, data: &[u8]) {
-    let mut event = mole_bss_types::wake_event::default();
+fn handle_event(wakeups: &mut Wakeups, slices: &mut Slices, _cpu: i32, data: &[u8]) {
+    let mut event = mole_bss_types::event::default();
 
     plain::copy_from_bytes(&mut event, data).expect("Data buffer was too short");
 
-    let wakeup = ctx
-        .entry((event.src_tgidpid, event.tgt_tgidpid))
-        .or_insert(0);
-    *wakeup += 1;
+    if event.kind == 0 {
+        let wakeup = wakeups
+            .entry((event.src_tgidpid, event.tgt_tgidpid))
+            .or_insert(0);
+        *wakeup += 1;
+    } else if event.kind == 1 {
+        let vec = slices.entry(event.src_tgidpid as i32).or_insert(vec![]);
+        (*vec).push(event.tgt_tgidpid);
+    }
 }
 
 fn handle_lost_events(cpu: i32, count: u64) {
     eprintln!("Lost {} events on CPU {}", count, cpu);
 }
 
-pub fn record_wakeups(tgid: i32, duration: Duration, verbose: bool) -> Result<Wakeups> {
+pub fn read_events(tgid: i32, duration: Duration, verbose: bool) -> Result<(Wakeups, Slices)> {
     let mut skel_builder = MoleSkelBuilder::default();
     if verbose {
         skel_builder.obj_builder.debug(true);
@@ -53,11 +59,12 @@ pub fn record_wakeups(tgid: i32, duration: Duration, verbose: bool) -> Result<Wa
     let mut skel = open_skel.load()?;
     skel.attach()?;
 
-    let mut ctx = Wakeups::new();
+    let mut wakeups = Wakeups::new();
+    let mut slices = Slices::new();
     {
         let perf = PerfBufferBuilder::new(skel.maps_mut().events())
             .sample_cb(|cpu: i32, data: &[u8]| {
-                handle_event(&mut ctx, cpu, data);
+                handle_event(&mut wakeups, &mut slices, cpu, data);
             })
             .lost_cb(handle_lost_events)
             .build()?;
@@ -71,5 +78,5 @@ pub fn record_wakeups(tgid: i32, duration: Duration, verbose: bool) -> Result<Wa
         }
     }
 
-    Ok(ctx)
+    Ok((wakeups, slices))
 }

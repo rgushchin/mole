@@ -241,6 +241,55 @@ fn print_wakeups(wakeups: &bpf::Wakeups, curr: &ProcessDataSnapshot) {
     println!("");
 }
 
+fn print_slices(slices: &mut bpf::Slices, curr: &ProcessDataSnapshot) {
+    let mut table = table![
+        ("pid", 8),
+        ("comm", 16),
+        ("slices", 10),
+        ("min", 6),
+        ("p5", 6),
+        ("p25", 6),
+        ("p50", 6),
+        ("p75", 6),
+        ("p95", 6),
+        ("max", 6)
+    ];
+
+    table.sort_by = Some(2); // sort by slices
+
+    for (pid, vec) in slices {
+        let unknown = "unknown".to_string();
+        let comm = match curr.threads.get(pid) {
+            Some(t) => &t.comm,
+            None => &unknown,
+        };
+        vec.sort_unstable();
+
+        let min = vec.first().unwrap();
+        let p5 = vec.get(vec.len() / 20).unwrap();
+        let p25 = vec.get(vec.len() / 4).unwrap();
+        let p50 = vec.get(vec.len() / 2).unwrap();
+        let p75 = vec.get(vec.len() / 4 * 3).unwrap();
+        let p95 = vec.get(vec.len() / 20 * 19).unwrap();
+        let max = vec.last().unwrap();
+
+        table.add_row(vec![
+            output::Data::Int(*pid as i64),
+            output::Data::Text(comm.to_string()),
+            output::Data::UInt(vec.len() as u64),
+            output::Data::UInt(*min),
+            output::Data::UInt(*p5),
+            output::Data::UInt(*p25),
+            output::Data::UInt(*p50),
+            output::Data::UInt(*p75),
+            output::Data::UInt(*p95),
+            output::Data::UInt(*max),
+        ]);
+    }
+
+    println!("{}", table.display_table());
+}
+
 #[derive(Debug, StructOpt)]
 struct CliArgs {
     #[structopt(short = "p", long, conflicts_with = "cmd")]
@@ -301,8 +350,8 @@ fn main() {
         let prev_stat = procfs::read_stat();
         let prev = inspect_process(pid).expect("Can't find the process");
 
-        let wakeups =
-            bpf::record_wakeups(pid, Duration::from_millis(args.sleep_ms), false).unwrap();
+        let (wakeups, mut slices) =
+            bpf::read_events(pid, Duration::from_millis(args.sleep_ms), false).unwrap();
 
         let curr_stat = procfs::read_stat();
         let curr = inspect_process(pid).expect("Can't find the process");
@@ -315,5 +364,6 @@ fn main() {
         );
 
         print_wakeups(&wakeups, &curr);
+        print_slices(&mut slices, &curr);
     }
 }
